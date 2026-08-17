@@ -1,26 +1,55 @@
-name: Android CI
+name: GhostCoder Android APK
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Checkout GhostCoder
+        uses: actions/checkout@v6
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Prepare llama.cpp Android project
+        run: |
+          chmod +x scripts/prepare.sh
+          ./scripts/prepare.sh
+
+      - name: Verify prepared project
+        run: |
+          ls -la build-src/examples/llama.android
+          ls -la build-src/examples/llama.android/app
+          test -f build-src/examples/llama.android/gradlew
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x build-src/examples/llama.android/gradlew
+
+      - name: Build debug APK
+        working-directory: build-src/examples/llama.android
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Copy APK
+        run: |
+          cp \
+            build-src/examples/llama.android/app/build/outputs/apk/debug/app-debug.apk \
+            GhostCoder-Android-1.0.0-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: GhostCoder-Android-1.0.0-debug
+          path: GhostCoder-Android-1.0.0-debug.apk
+          if-no-files-found: error
